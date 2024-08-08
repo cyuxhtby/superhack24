@@ -5,7 +5,9 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IVault} from "./interfaces/IVault.sol";
-import {OracleInterface} from "";
+import {IPyth} from "@pythnetwork/pyth-sdk-solidity/IPyth.sol";
+import {PythStructs} from "@pythnetwork/pyth-sdk-solidity/PythStructs.sol";
+import {PythUtils} from "@pythnetwork/pyth-sdk-solidity/PythUtils.sol";
 
 /// @dev Market-Weighted Index Fund Vault
 contract Vault is IVault, ERC20 {
@@ -14,7 +16,7 @@ contract Vault is IVault, ERC20 {
     struct Asset {
         IERC20 token;
         uint256 balance;
-        OracleInterface priceOracle;
+        bytes32 priceFeedId;
     }
 
     struct Pool {
@@ -34,19 +36,24 @@ contract Vault is IVault, ERC20 {
         _;
     }
 
+    IPyth public pyth;
+
     constructor(
         address[] memory _tokens,
-        address[] memory _oracles,
+        bytes32[] memory _priceFeedIds,
+        address pythContract,
         string memory name,
         string memory symbol
     ) ERC20(name, symbol) {
-        if (_tokens.length != _oracles.length) revert Vault__TokensAndOraclesLengthMismatch();
+        if (_tokens.length != _priceFeedIds.length) revert Vault__TokensAndOraclesLengthMismatch();
+
+        pyth = IPyth(pythContract);
 
         for (uint256 i = 0; i < _tokens.length; i++) {
             assets[_tokens[i]] = Asset({
                 token: IERC20(_tokens[i]),
                 balance: 0,
-                priceOracle: OracleInterface(_oracles[i])
+                priceFeedId: _priceFeedIds[i]
             });
             assetList.push(_tokens[i]);
         }
@@ -73,8 +80,13 @@ contract Vault is IVault, ERC20 {
         emit PoolRemoved(_pool);
     }
 
-    function deposit(uint256[] calldata _amounts) external returns (uint256 lpTokensMinted) {
+    // `pythUpdateData` is the binary pyth price update data retrieved from Pyth's Hermes API,
+    // it updates the onchain price if the provided update is more recent than the current onchain price.
+    function deposit(uint256[] calldata _amounts, bytes[] calldata pythUpdateData) external payable returns (uint256 lpTokensMinted) {
         if (_amounts.length != assetList.length) revert Vault__IncorrectAmountsLength();
+
+        uint256 fee = pyth.getUpdateFee(pythUpdateData);
+        pyth.updatePriceFeeds{value: fee}(pythUpdateData);
 
         uint256 totalValue = 0;
         uint256 totalSupplyCache = totalSupply();
@@ -98,8 +110,11 @@ contract Vault is IVault, ERC20 {
         emit Deposit(msg.sender, _amounts, lpTokensMinted);
     }
 
-    function withdraw(uint256 _lpTokens) external returns (uint256[] memory amounts) {
+    function withdraw(uint256 _lpTokens, bytes[] calldata pythUpdateData) external payable returns (uint256[] memory amounts) {
         if (balanceOf(msg.sender) < _lpTokens) revert Vault__InsufficientLPTokens();
+
+        uint256 fee = pyth.getUpdateFee(pythUpdateData);
+        pyth.updatePriceFeeds{value: fee}(pythUpdateData);
 
         uint256 userShare = (_lpTokens * PRECISION) / totalSupply();
         amounts = new uint256[](assetList.length);
@@ -121,11 +136,10 @@ contract Vault is IVault, ERC20 {
         emit Withdraw(msg.sender, _lpTokens, amounts);
     }
 
-    function getTokensForPool(address _pool) external view override returns (address[] memory) {
+    function getTokensForPool(address _pool) external view override returns (address[] memory tokens) {
         Pool memory pool = pools[_pool];
         if (!pool.isActive) revert Vault__PoolDoesNotExist();
 
-        address;
         tokens[0] = pool.token0;
         tokens[1] = pool.token1;
         return tokens;
@@ -137,7 +151,6 @@ contract Vault is IVault, ERC20 {
         if (_tokens.length != 2 || _tokens[0] != pool.token0 || _tokens[1] != pool.token1) 
             revert Vault__InvalidTokensLength();
 
-        reserves = new uint256 ;
         reserves[0] = getVirtualReserve(_tokens[0]);
         reserves[1] = getVirtualReserve(_tokens[1]);
     }
@@ -168,6 +181,8 @@ contract Vault is IVault, ERC20 {
     }
 
     function _getCurrentPrice(Asset storage asset) internal view returns (uint256 price) {
-        // TODO
+        PythStructs.Price memory pythPrice = pyth.getPrice(asset.priceFeedId);
+        if (pythPrice.price <= 0) revert Vault__InvalidOraclePrice();
+        price = PythUtils.convertToUint(pythPrice.price, pythPrice.expo, 18);
     }
 }
