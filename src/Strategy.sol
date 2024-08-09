@@ -119,16 +119,13 @@ contract Strategy is BaseStrategy {
         // _totalAssets = asset.balanceOf(address(this));
 
         if(!TokenizedStrategy.isShutdown()) {
-            uint256 assetBalance = _balanceAsset();
-            if (assetBalance > 0) {
-                _deployFunds(assetBalance); //stake LP
-            }
+            _claimAndSellRewards();
         }
-        _totalAssets = asset.balanceOf(address(this));
+        _totalAssets = asset.balanceOf(address(this)); 
     }
 
-    function _balanceAsset() internal view returns (uint256) {
-        return ERC20(asset).balanceOf(address(this));
+    function _claimAndSellRewards() internal view returns (uint256) {
+        // TODO: sell all the swap fees and claim lp tokens
     }
 
     /*//////////////////////////////////////////////////////////////
