@@ -1,2 +1,6 @@
 @openzeppelin/contracts/=lib/valantis-core/lib/openzeppelin-contracts/contracts
 @pythnetwork/pyth-sdk-solidity/=node_modules/@pythnetwork/pyth-sdk-solidity
+@openzeppelin/=lib/openzeppelin-contracts
+forge-std/=lib/forge-std/src
+@tokenized-strategy/=lib/tokenized-strategy/src
+@periphery/=lib/tokenized-strategy-periphery/src
