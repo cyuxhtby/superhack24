@@ -44,9 +44,7 @@ contract Strategy is BaseStrategy {
      * to deposit in the yield source.
      */
     function _deployFunds(uint256 _amount) internal override {
-        // TODO: implement deposit logic EX:
-        //
-        //      lendingPool.deposit(address(asset), _amount ,0);
+        
         ERC20 _asset = ERC20(TokenizedStrategy.asset());
         _asset.safeTransferFrom(msg.sender, address(this), _amount);
 
@@ -75,10 +73,7 @@ contract Strategy is BaseStrategy {
      * @param _amount, The amount of 'asset' to be freed.
      */
     function _freeFunds(uint256 _amount) internal override {
-        // TODO: implement withdraw logic EX:
-        //
-        //      lendingPool.withdraw(address(asset), _amount);
-
+       
         TokenizedStrategy.withdraw(_amount, msg.sender, msg.sender);
     }
 
@@ -109,23 +104,17 @@ contract Strategy is BaseStrategy {
         override
         returns (uint256 _totalAssets)
     {
-        // TODO: Implement harvesting logic and accurate accounting EX:
-        //
-        //      if(!TokenizedStrategy.isShutdown()) {
-        //          _claimAndSellRewards();
-        //      }
-        //      _totalAssets = aToken.balanceOf(address(this)) + asset.balanceOf(address(this));
-        //
-        // _totalAssets = asset.balanceOf(address(this));
-
         if(!TokenizedStrategy.isShutdown()) {
             _claimAndSellRewards();
         }
         _totalAssets = asset.balanceOf(address(this)); 
     }
 
-    function _claimAndSellRewards() internal view returns (uint256) {
-        // TODO: sell all the swap fees and claim lp tokens
+    function _claimAndSellRewards() internal {
+        // Claim all the swap fee rewards in the form of vault LP tokens
+        ERC20 _asset = ERC20(TokenizedStrategy.asset());
+        uint256 accruedFees = _asset.balanceOf(0x8ad5acb43f6644f7CeF288E4aD8aA7ac76117a50); //Vault address
+        _asset.safeTransferFrom(0x8ad5acb43f6644f7CeF288E4aD8aA7ac76117a50, address(this), accruedFees);
     }
 
     /*//////////////////////////////////////////////////////////////
