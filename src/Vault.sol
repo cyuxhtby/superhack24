@@ -4,12 +4,13 @@ pragma solidity ^0.8.19;
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {IVault} from "./interfaces/IVault.sol";
 import {IPyth} from "@pythnetwork/pyth-sdk-solidity/IPyth.sol";
 import {PythStructs} from "@pythnetwork/pyth-sdk-solidity/PythStructs.sol";
 import {PythUtils} from "@pythnetwork/pyth-sdk-solidity/PythUtils.sol";
+import {IVault} from "./interfaces/IVault.sol";
 
-/// @dev Market-Weighted Index Fund Vault
+
+/// @notice Market-Weighted Index Fund Vault
 contract Vault is IVault, ERC20 {
     using SafeERC20 for IERC20;
 
@@ -74,7 +75,7 @@ contract Vault is IVault, ERC20 {
     }
 
     function removePool(address _pool) external onlyLM {
-        if (!pools[_pool].isActive) revert Vault__PoolDoesNotExist();
+        if (!pools[_pool].isActive) revert Vault__InvalidPool();
         pools[_pool].isActive = false;
 
         emit PoolRemoved(_pool);
@@ -138,7 +139,7 @@ contract Vault is IVault, ERC20 {
 
     function getTokensForPool(address _pool) external view override returns (address[] memory tokens) {
         Pool memory pool = pools[_pool];
-        if (!pool.isActive) revert Vault__PoolDoesNotExist();
+        if (!pool.isActive) revert Vault__InvalidPool();
 
         tokens[0] = pool.token0;
         tokens[1] = pool.token1;
@@ -147,20 +148,20 @@ contract Vault is IVault, ERC20 {
 
     function getReservesForPool(address _pool, address[] calldata _tokens) external view override returns (uint256[] memory reserves) {
         Pool memory pool = pools[_pool];
-        if (!pool.isActive) revert Vault__PoolDoesNotExist();
+        if (!pool.isActive) revert Vault__InvalidPool();
         if (_tokens.length != 2 || _tokens[0] != pool.token0 || _tokens[1] != pool.token1) 
             revert Vault__InvalidTokensLength();
 
-        reserves[0] = getVirtualReserve(_tokens[0]);
-        reserves[1] = getVirtualReserve(_tokens[1]);
+        reserves[0] = getMarketWeightedReserve(_tokens[0]);
+        reserves[1] = getMarketWeightedReserve(_tokens[1]);
     }
 
     function claimPoolManagerFees(uint256 _feePoolManager0, uint256 _feePoolManager1) external {}
 
-    function getVirtualReserve(address assetAddress) public view returns (uint256 virtualReserve) {
+    function getMarketWeightedReserve(address assetAddress) public view returns (uint256 marketWeightedReserve) {
         Asset storage asset = assets[assetAddress];
         uint256 price = _getCurrentPrice(asset);
-        virtualReserve = asset.balance * price / PRECISION;
+        marketWeightedReserve = asset.balance * price / PRECISION;
     }
 
     function getTotalValue() public view returns (uint256 total) {

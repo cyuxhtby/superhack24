@@ -12,7 +12,7 @@ interface IVault is ISovereignVaultMinimal {
     error Vault__TokensAndOraclesLengthMismatch();
     error Vault__PoolAlreadyExists();
     error Vault__TokenNotSupported();
-    error Vault__PoolDoesNotExist();
+    error Vault__InvalidPool();
     error Vault__IncorrectAmountsLength();
     error Vault__AmountMustBeGreaterThanZero();
     error Vault__InsufficientLPTokens();
