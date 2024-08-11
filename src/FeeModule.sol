@@ -30,6 +30,7 @@ contract FeeModule is ISwapFeeModule {
         });
     }
 
+    // N/A
     function callbackOnSwapEnd(
         uint256 _effectiveFee,
         int24 _spotPriceTick,
@@ -43,7 +44,37 @@ contract FeeModule is ISwapFeeModule {
         uint256 _amountInUsed,
         uint256 _amountOut,
         SwapFeeModuleData memory _swapFeeModuleData
-    ) external override {}
+    ) external override {
+        if (_effectiveFee == 0) return;
+
+        address pool = msg.sender;
+
+        address token0 = vault.getTokensForPool(pool)[0];
+        address token1 = vault.getTokensForPool(pool)[1];
+
+        address[] memory tokens = new address[](2);
+        uint256 reserveIn;
+        uint256 reserveOut;
+
+        if (_amountInUsed > _amountOut) {
+            // Assume token0 is tokenIn, token1 is tokenOut
+            reserveIn = vault.getMarketWeightedReserve(token0);
+            reserveOut = vault.getMarketWeightedReserve(token1);
+        } else {
+            // Assume token1 is tokenIn, token0 is tokenOut
+            reserveIn = vault.getMarketWeightedReserve(token1);
+            reserveOut = vault.getMarketWeightedReserve(token0);
+        }
+
+        uint256 feeValue = (reserveOut * _effectiveFee) / reserveIn;
+
+        // Mint LP tokens based on the fee value
+        uint256 totalSupplyCache = vault.totalSupply();
+        uint256 lpTokensMinted = (totalSupplyCache == 0) ? feeValue : (feeValue * totalSupplyCache) / vault.getTotalValue();
+
+        address recipient = address(this); // placeholder for erc4626 
+        vault.mintLPTokens(lpTokensMinted, recipient); // this function does not exist rn
+    }
  
     // Calculates dynamic fee from market-weighted reserves and ensures it's not below the base fee.
     // Majority asset gives higher fees, and lower fees for minority asset.
