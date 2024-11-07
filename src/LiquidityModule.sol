@@ -5,7 +5,8 @@ import { ISovereignALM } from "valantis-core/ALM/interfaces/ISovereignALM.sol";
 import { ALMLiquidityQuoteInput, ALMLiquidityQuote } from "valantis-core/ALM/structs/SovereignALMStructs.sol";
 import { IVault } from './interfaces/IVault.sol';
 
-contract ALM is ISovereignALM {
+/// @notice Algorithmic Liquidity Module quoting constant product
+contract LiquidityModule is ISovereignALM {
     IVault public vault;
     address public pool;
 
